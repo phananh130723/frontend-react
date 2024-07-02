@@ -1,0 +1,72 @@
+name: Build Step
+on:
+  push:
+    branches: ['main']
+jobs:
+  build:
+    runs-on: runner-demo 
+    strategy:
+      matrix:
+        node-version: [14.20.0]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build --if-present
+
+  test-stage:
+    runs-on: runner-demo
+    needs: build
+    steps:
+      - name: Running Tests
+        uses: actions/checkout@v4
+      - run: echo "Testing!!!"
+
+  build-and-push-docker-image:
+    name: Build Docker image and push to repositories
+    runs-on: runner-demo
+    needs: ['build', 'test-stage']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: phananh130723/react:${{ github.sha }}
+      - name: Image digest
+        run: echo ${{ steps.docker_build.outputs.digest }}
+
+  update-manifest-stage:
+    runs-on: runner-demo
+    needs: ['build-and-push-docker-image']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: phananh130723/react-manifest
+          ref: 'main'
+          token: ${{ secrets.G_TOKEN }}
+      - name: setup git config
+        run: |
+          git config --global user.email "phananh130723@gmail.com"
+          git config --global user.name "phananh130723"
+          sed -i "s#phananh130723/react.*#phananh130723/react:${{ github.sha }}#g" deployment.yaml
+          git add .
+          git commit -am "Update image for - ${{ github.sha }}"
+      - run: echo ${{ github }}
+      - run: git push -u origin main
