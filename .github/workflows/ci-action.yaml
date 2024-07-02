@@ -1,4 +1,4 @@
-name: Build Step
+name: Build react
 on:
   push:
     branches: ['main']
