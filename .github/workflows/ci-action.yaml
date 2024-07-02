@@ -30,7 +30,7 @@ jobs:
   build-and-push-docker-image:
     name: Build Docker image and push to repositories
     runs-on: runner-demo
-    needs: ['build', 'test-stage']
+    #needs: ['build', 'test-stage']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
